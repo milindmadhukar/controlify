@@ -28,9 +28,6 @@ func SaveFrames(foldername string, frames []*image.RGBA) {
 }
 
 func SplitFrames(frames []*image.RGBA) ([]*image.RGBA, []*image.RGBA) {
-
-	log.Println("Splitting frames")
-
 	leftFrames := make([]*image.RGBA, len(frames))
 	rightFrames := make([]*image.RGBA, len(frames))
 
@@ -44,8 +41,6 @@ func SplitFrames(frames []*image.RGBA) ([]*image.RGBA, []*image.RGBA) {
 		leftFrames[i] = leftFrame
 		rightFrames[i] = rightFrame
 	}
-
-	log.Println("Frames split")
 
 	return leftFrames, rightFrames
 }

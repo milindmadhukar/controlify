@@ -4,7 +4,6 @@ import (
 	"encoding/json"
 	"image"
 	"log"
-	"net/http"
 	"os"
 	"time"
 
@@ -14,10 +13,9 @@ import (
 	"golang.org/x/image/draw"
 )
 
-var framesChan = make(chan image.Image, 100)
+var framesChan = make(chan image.Image)
 
 func main() {
-	go http.ListenAndServe(":8069", nil)
 
 	defer close(framesChan)
 
@@ -66,12 +64,12 @@ func main() {
 	plusPixelCount := utils.GetPixelCount(&plusMap)
 	crossPixelCount := utils.GetPixelCount(&crossMap)
 
-	fps := 10
+	fps := 1
 	brightness := 0.4
-	delay := 1000 / fps
+	delay := 1e9 / fps
 	splitImage := false
 
-	ticker := time.NewTicker(time.Millisecond * time.Duration(delay))
+	ticker := time.NewTicker(time.Duration(delay) * time.Nanosecond)
 
 	frames, err := utils.GetGIFFrames("assets/gifs/fire.gif")
 	// frames, err := GetMp4Frames("./oops.mp4")
