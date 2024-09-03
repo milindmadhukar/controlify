@@ -7,7 +7,7 @@ import (
 	"golang.org/x/image/draw"
 )
 
-func GetPixelCount(ledMap *models.MatrixMap) int {
+func GetPixelCountFromMap(ledMap *models.MatrixMap) int {
 	count := 0
 
 	for _, idx := range ledMap.Map {

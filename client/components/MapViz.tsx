@@ -25,6 +25,7 @@ const MapViz: React.FC<MapVizProps> = ({ mapName, canvasRef, position }) => {
 
   const updateColors = useCallback(() => {
     if (mapData && canvasRef.current && mapRef.current && imgRef.current) {
+      if (!mapData.width || !mapData.height || !position.width || !position.height) return;
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
@@ -59,7 +60,7 @@ const MapViz: React.FC<MapVizProps> = ({ mapName, canvasRef, position }) => {
         // Try to get the background image URL
         const bgImageStyle = window.getComputedStyle(canvasRef.current.firstElementChild as Element).backgroundImage;
         const bgImageUrl = bgImageStyle.replace(/url\(['"]?(.+?)['"]?\)/, '$1');
-        
+
         img.src = bgImageUrl;
         img.onload = () => {
           imgRef.current = img;
@@ -88,6 +89,7 @@ const MapViz: React.FC<MapVizProps> = ({ mapName, canvasRef, position }) => {
             }}
           >
             {mapData.map.map((value, index) => (
+              //console.log(cellColors[index]),
               <div
                 key={index}
                 className="rounded-full"

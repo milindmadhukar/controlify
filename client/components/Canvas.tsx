@@ -3,10 +3,6 @@ import { Rnd } from 'react-rnd';
 import MapViz from './MapViz';
 import bg from '../public/bg.jpg';
 
-interface CanvasProps {
-  mapNames: string[];
-}
-
 interface MapPosition {
   x: number;
   y: number;
@@ -14,20 +10,24 @@ interface MapPosition {
   height: number;
 }
 
-const Canvas: React.FC<CanvasProps> = ({ mapNames }) => {
+interface ServerMessage {
+  pixelInfo: PixelInfo[];
+  currentFrame?: string;
+}
+
+interface PixelInfo {
+  mapName: string;
+  ledCount: number;
+  pixelData: string[];
+}
+
+const Canvas: React.FC = () => {
   const canvasRef = useRef<HTMLDivElement>(null);
   const [canvasSize, setCanvasSize] = useState({ width: 0, height: 0 });
   const [mapPositions, setMapPositions] = useState<MapPosition[]>([]);
+  const [socket, setSocket] = useState<WebSocket | null>(null);
+  const [serverMessage, setServerMessage] = useState<ServerMessage | null>(null);
   const [backgroundImage, setBackgroundImage] = useState<string | null>(null);
-
-  useEffect(() => {
-    const img = new Image();
-    img.src = bg.src;
-    img.onload = () => {
-      setBackgroundImage(bg.src);
-      updateCanvasSize(img.width / img.height);
-    };
-  }, []);
 
   const updateCanvasSize = (imageAspectRatio: number) => {
     if (canvasRef.current) {
@@ -47,6 +47,52 @@ const Canvas: React.FC<CanvasProps> = ({ mapNames }) => {
   };
 
   useEffect(() => {
+    const ws = new WebSocket('ws://localhost:8069/ws');
+
+    ws.onopen = () => {
+      console.log('Connected to WebSocket');
+    };
+
+    ws.onmessage = (event) => {
+      const data: ServerMessage = JSON.parse(event.data);
+      setServerMessage(data);
+      // Set background image
+    };
+
+    ws.onclose = () => {
+      console.log('Disconnected from WebSocket');
+    };
+
+    setSocket(ws);
+
+    // HACK: Maybe send message on every update
+    const stop = setInterval(() => {
+      ws.send(JSON.stringify({
+        x: 10,
+        y: 12,
+        width: 30,
+        height: 34,
+      }
+      ));
+    }, 1000);
+
+    return () => {
+      // Stop
+      clearInterval(stop);
+      ws.close();
+    };
+  }, []);
+
+  useEffect(() => {
+    const img = new Image();
+    img.src = bg.src;
+    img.onload = () => {
+      setBackgroundImage(bg.src);
+      updateCanvasSize(img.width / img.height);
+    };
+  }, []);
+
+  useEffect(() => {
     const handleResize = () => {
       if (backgroundImage) {
         const img = new Image();
@@ -59,14 +105,18 @@ const Canvas: React.FC<CanvasProps> = ({ mapNames }) => {
     return () => window.removeEventListener('resize', handleResize);
   }, [backgroundImage]);
 
+  // TODO: Re-enable this
+
   useEffect(() => {
-    setMapPositions(mapNames.map((_, index) => ({
-      x: (index % 2) * (canvasSize.width / 2),
-      y: Math.floor(index / 2) * (canvasSize.height / 2),
-      width: canvasSize.width / 2,
-      height: canvasSize.height / 2,
-    })));
-  }, [mapNames, canvasSize]);
+    if (serverMessage && canvasSize.width > 0 && canvasSize.height > 0) {
+      setMapPositions(serverMessage.pixelInfo.map((_, index) => ({
+        x: (index % 2) * (canvasSize.width / 2),
+        y: Math.floor(index / 2) * (canvasSize.height / 2),
+        width: canvasSize.width / 2,
+        height: canvasSize.height / 2,
+      })));
+    }
+  }, [serverMessage, canvasSize]);
 
   const handleResize = (index: number, e: MouseEvent | TouchEvent, direction: any, ref: HTMLElement, delta: any, position: { x: number; y: number }) => {
     let { width: refwidth, height: refheight } = ref.style;
@@ -105,7 +155,6 @@ const Canvas: React.FC<CanvasProps> = ({ mapNames }) => {
           height: `${canvasSize.height}px`,
         }}
       >
-        {/* Background image with 20% opacity */}
         <div
           className="absolute inset-0"
           style={{
@@ -117,7 +166,7 @@ const Canvas: React.FC<CanvasProps> = ({ mapNames }) => {
             height: '100%',
           }}
         />
-        {mapNames.map((mapName, index) => (
+        {serverMessage ? (serverMessage?.pixelInfo.map((pixelInfo, index) => (
           <Rnd
             key={index}
             size={{ width: mapPositions[index]?.width || 0, height: mapPositions[index]?.height || 0 }}
@@ -145,12 +194,12 @@ const Canvas: React.FC<CanvasProps> = ({ mapNames }) => {
             }}
           >
             <MapViz
-              mapName={mapName}
+              mapName={pixelInfo.mapName}
               canvasRef={canvasRef}
               position={mapPositions[index]}
             />
           </Rnd>
-        ))}
+        ))) : <>Loading...</>}
       </div>
     </div>
   );
