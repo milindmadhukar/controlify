@@ -1,4 +1,4 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
 import { Map } from '../types/map';
 
 interface MapVizProps {
@@ -11,6 +11,7 @@ const MapViz: React.FC<MapVizProps> = ({ mapName, canvasRef, position }) => {
   const [mapData, setMapData] = useState<Map | null>(null);
   const [cellColors, setCellColors] = useState<string[]>([]);
   const mapRef = useRef<HTMLDivElement>(null);
+  const imgRef = useRef<HTMLImageElement | null>(null);
 
   useEffect(() => {
     async function fetchMapData() {
@@ -22,39 +23,56 @@ const MapViz: React.FC<MapVizProps> = ({ mapName, canvasRef, position }) => {
     fetchMapData();
   }, [mapName]);
 
-  useEffect(() => {
-    if (mapData && canvasRef.current && mapRef.current) {
+  const updateColors = useCallback(() => {
+    if (mapData && canvasRef.current && mapRef.current && imgRef.current) {
       const canvas = document.createElement('canvas');
       const ctx = canvas.getContext('2d');
       if (!ctx) return;
 
-      const img = new Image();
-      img.crossOrigin = 'Anonymous';
-      img.src = canvasRef.current.style.backgroundImage.slice(5, -2);
+      const img = imgRef.current;
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      ctx.drawImage(img, 0, 0, img.naturalWidth, img.naturalHeight);
 
-      img.onload = () => {
-        canvas.width = img.width;
-        canvas.height = img.height;
-        ctx.drawImage(img, 0, 0, img.width, img.height);
+      const colors = mapData.map.map((value, index) => {
+        if (value === -1) return 'transparent';
 
-        const colors = mapData.map.map((_, index) => {
-          const x = (index % mapData.width) / mapData.width * position.width + position.x;
-          const y = Math.floor(index / mapData.width) / mapData.height * position.height + position.y;
+        const x = (index % mapData.width) / mapData.width * position.width + position.x;
+        const y = Math.floor(index / mapData.width) / mapData.height * position.height + position.y;
 
-          const pixelX = Math.floor(x / canvasRef.current!.clientWidth * img.width);
-          const pixelY = Math.floor(y / canvasRef.current!.clientHeight * img.height);
+        const pixelX = Math.floor(x / canvasRef.current!.clientWidth * img.naturalWidth);
+        const pixelY = Math.floor(y / canvasRef.current!.clientHeight * img.naturalHeight);
 
-          const pixel = ctx.getImageData(pixelX, pixelY, 1, 1).data;
-          return `#${pixel[0].toString(16).padStart(2, '0')}${pixel[1].toString(16).padStart(2, '0')}${pixel[2].toString(16).padStart(2, '0')}`;
-        });
+        const pixel = ctx.getImageData(pixelX, pixelY, 1, 1).data;
+        return `rgb(${pixel[0]}, ${pixel[1]}, ${pixel[2]})`;
+      });
 
-        setCellColors(colors);
-      };
+      setCellColors(colors);
     }
   }, [mapData, canvasRef, position]);
 
+  useEffect(() => {
+    if (mapData && canvasRef.current) {
+      if (!imgRef.current) {
+        const img = new Image();
+        img.crossOrigin = 'Anonymous';
+        // Try to get the background image URL
+        const bgImageStyle = window.getComputedStyle(canvasRef.current.firstElementChild as Element).backgroundImage;
+        const bgImageUrl = bgImageStyle.replace(/url\(['"]?(.+?)['"]?\)/, '$1');
+        
+        img.src = bgImageUrl;
+        img.onload = () => {
+          imgRef.current = img;
+          updateColors();
+        };
+      } else {
+        updateColors();
+      }
+    }
+  }, [mapData, canvasRef, position, updateColors]);
+
   return (
-    <div ref={mapRef} className="p-2 rounded-md shadow-md h-full w-full flex flex-col">
+    <div ref={mapRef} className="bg-transparent p-2 rounded-md shadow-md h-full w-full flex flex-col">
       {mapData ? (
         <div className="flex-grow flex items-center justify-center overflow-hidden">
           <div
@@ -72,10 +90,11 @@ const MapViz: React.FC<MapVizProps> = ({ mapName, canvasRef, position }) => {
             {mapData.map.map((value, index) => (
               <div
                 key={index}
-                className={`rounded-full ${
-                  value === -1 ? 'opacity-30' : 'opacity-90'
-                }`}
-                style={{ backgroundColor: cellColors[index] || 'green' }}
+                className="rounded-full"
+                style={{
+                  backgroundColor: cellColors[index] || 'transparent',
+                  opacity: value === -1 ? 0 : 1,
+                }}
               />
             ))}
           </div>
